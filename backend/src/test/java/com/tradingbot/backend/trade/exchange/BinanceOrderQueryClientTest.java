@@ -4,7 +4,9 @@ import com.tradingbot.backend.trade.exchange.config.BinanceApiProperties;
 import com.tradingbot.backend.trade.order.ExchangeOrderSnapshot;
 import com.tradingbot.backend.trade.order.ExchangeOrderStatus;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
@@ -18,6 +20,7 @@ import org.springframework.http.MediaType;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 class BinanceOrderQueryClientTest {
@@ -223,5 +226,323 @@ class BinanceOrderQueryClientTest {
                 ExchangeOrderStatus.UNKNOWN,
                 snapshot.status()
         );
+    }
+
+    @Test
+    void orderDoesNotExistReturnsNotFound() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(
+                        requestTo(
+                                org.hamcrest.Matchers.containsString(
+                                        "/api/v3/order"
+                                )
+                        )
+                )
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(
+                        withStatus(HttpStatus.BAD_REQUEST)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body("""
+                            {
+                              "code": -2013,
+                              "msg": "Order does not exist."
+                            }
+                            """)
+                );
+
+        BinanceOrderQueryClient client =
+                new BinanceOrderQueryClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        ExchangeOrderSnapshot snapshot =
+                client.getOrder(
+                        "ETHUSDT",
+                        "bot-123"
+                );
+
+        assertEquals(
+                ExchangeOrderStatus.NOT_FOUND,
+                snapshot.status()
+        );
+
+        assertEquals(
+                "ETHUSDT",
+                snapshot.symbol()
+        );
+
+        assertEquals(
+                "bot-123",
+                snapshot.clientOrderId()
+        );
+
+        assertEquals(
+                null,
+                snapshot.exchangeOrderId()
+        );
+
+        assertEquals(
+                0,
+                snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO)
+        );
+
+        server.verify();
+    }
+
+    @Test
+    void otherBadRequestIsNotTreatedAsNotFound() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(
+                        requestTo(
+                                org.hamcrest.Matchers.containsString(
+                                        "/api/v3/order"
+                                )
+                        )
+                )
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(
+                        withStatus(HttpStatus.BAD_REQUEST)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body("""
+                            {
+                              "code": -1102,
+                              "msg": "Mandatory parameter was not sent."
+                            }
+                            """)
+                );
+
+        BinanceOrderQueryClient client =
+                new BinanceOrderQueryClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        assertThrows(
+                HttpClientErrorException.BadRequest.class,
+                () -> client.getOrder(
+                        "ETHUSDT",
+                        "bot-123"
+                )
+        );
+
+        server.verify();
+    }
+
+    @Test
+    void serverErrorReturnsUnknownSnapshot() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(
+                        requestTo(
+                                org.hamcrest.Matchers.containsString(
+                                        "/api/v3/order"
+                                )
+                        )
+                )
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(
+                        withStatus(
+                                HttpStatus.INTERNAL_SERVER_ERROR
+                        )
+                );
+
+        BinanceOrderQueryClient client =
+                new BinanceOrderQueryClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        ExchangeOrderSnapshot snapshot =
+                client.getOrder(
+                        "ETHUSDT",
+                        "bot-123"
+                );
+
+        assertEquals(
+                ExchangeOrderStatus.UNKNOWN,
+                snapshot.status()
+        );
+
+        assertEquals(
+                "ETHUSDT",
+                snapshot.symbol()
+        );
+
+        assertEquals(
+                "bot-123",
+                snapshot.clientOrderId()
+        );
+
+        assertEquals(
+                null,
+                snapshot.exchangeOrderId()
+        );
+
+        assertEquals(
+                0,
+                snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO)
+        );
+
+        server.verify();
+    }
+
+    @Test
+    void networkFailureReturnsUnknownSnapshot() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(
+                requestTo(
+                        org.hamcrest.Matchers.containsString(
+                                "/api/v3/order"
+                        )
+                )
+        ).andRespond(
+                withException(
+                        new java.io.IOException(
+                                "simulated network failure"
+                        )
+                )
+        );
+
+        BinanceOrderQueryClient client =
+                new BinanceOrderQueryClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        ExchangeOrderSnapshot snapshot =
+                client.getOrder(
+                        "ETHUSDT",
+                        "bot-123"
+                );
+
+        assertEquals(
+                ExchangeOrderStatus.UNKNOWN,
+                snapshot.status()
+        );
+
+        assertEquals(
+                "ETHUSDT",
+                snapshot.symbol()
+        );
+
+        assertEquals(
+                "bot-123",
+                snapshot.clientOrderId()
+        );
+
+        assertEquals(
+                null,
+                snapshot.exchangeOrderId()
+        );
+
+        assertEquals(
+                0,
+                snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO)
+        );
+
+        server.verify();
     }
 }

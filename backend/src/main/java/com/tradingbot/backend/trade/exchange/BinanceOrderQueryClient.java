@@ -8,7 +8,13 @@ import org.springframework.web.client.RestClient;
 import com.tradingbot.backend.trade.order.ExchangeOrderSnapshot;
 import com.tradingbot.backend.trade.order.ExchangeOrderStatus;
 import java.time.Clock;
+import com.tradingbot.backend.trade.exchange.dto.BinanceErrorResponse;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
+
+import java.math.BigDecimal;
 @Component
 public class BinanceOrderQueryClient
         implements OrderQueryClient {
@@ -78,31 +84,67 @@ public class BinanceOrderQueryClient
                         properties.secret()
                 );
 
-        RestClient.RequestHeadersSpec<?> httpRequest =
-                restClient.get()
-                        .uri(
-                                "/api/v3/order?"
-                                        + payload
-                                        + "&signature="
-                                        + signature
-                        );
+        try {
 
-        httpRequest.header(
-                "X-MBX-APIKEY",
-                properties.key()
-        );
+            RestClient.RequestHeadersSpec<?> httpRequest =
+                    restClient.get()
+                            .uri(
+                                    "/api/v3/order?"
+                                            + payload
+                                            + "&signature="
+                                            + signature
+                            );
 
-        BinanceOrderQueryResponse response =
-                httpRequest.retrieve()
-                        .body(BinanceOrderQueryResponse.class);
+            httpRequest.header(
+                    "X-MBX-APIKEY",
+                    properties.key()
+            );
 
-        if (response == null) {
-            throw new IllegalStateException(
-                    "Binance order query response is null"
+            BinanceOrderQueryResponse response =
+                    httpRequest.retrieve()
+                            .body(BinanceOrderQueryResponse.class);
+
+            if (response == null) {
+                throw new IllegalStateException(
+                        "Binance order query response is null"
+                );
+            }
+
+            return toSnapshot(response);
+
+        } catch (HttpClientErrorException.BadRequest e) {
+
+            BinanceErrorResponse error =
+                    e.getResponseBodyAs(
+                            BinanceErrorResponse.class
+                    );
+
+            if (error != null
+                    && error.code() == -2013) {
+
+                return new ExchangeOrderSnapshot(
+                        symbol,
+                        clientOrderId,
+                        null,
+                        ExchangeOrderStatus.NOT_FOUND,
+                        BigDecimal.ZERO
+                );
+            }
+
+            throw e;
+        } catch (
+                HttpServerErrorException
+                | ResourceAccessException e
+        ) {
+
+            return new ExchangeOrderSnapshot(
+                    symbol,
+                    clientOrderId,
+                    null,
+                    ExchangeOrderStatus.UNKNOWN,
+                    BigDecimal.ZERO
             );
         }
-
-        return toSnapshot(response);
     }
 
     static String buildPayload(
@@ -156,4 +198,6 @@ public class BinanceOrderQueryClient
                 response.executedQty()
         );
     }
+
+
 }
