@@ -267,4 +267,51 @@ class BinanceExchangePositionProviderTest {
                 .getAccount();
 
     }
+
+    @Test
+    void missingSymbolInExchangeInfoThrowsException() {
+
+        BinanceAccountClient accountClient =
+                mock(BinanceAccountClient.class);
+
+        BinanceMarketClient marketClient =
+                mock(BinanceMarketClient.class);
+
+        TradingSymbolsProperties symbols =
+                new TradingSymbolsProperties(
+                        List.of("ETHUSDT")
+                );
+
+        when(accountClient.getAccount())
+                .thenReturn(
+                        new BinanceAccountResponse(
+                                List.of(
+                                        new BinanceBalance(
+                                                "ETH",
+                                                new BigDecimal("0.1"),
+                                                BigDecimal.ZERO
+                                        )
+                                )
+                        )
+                );
+
+        when(marketClient.getExchangeInfo("ETHUSDT"))
+                .thenReturn(
+                        new BinanceExchangeInfoResponse(
+                                List.of()
+                        )
+                );
+
+        BinanceExchangePositionProvider provider =
+                new BinanceExchangePositionProvider(
+                        accountClient,
+                        symbols,
+                        marketClient
+                );
+
+        assertThrows(
+                IllegalStateException.class,
+                provider::getPositions
+        );
+    }
 }
