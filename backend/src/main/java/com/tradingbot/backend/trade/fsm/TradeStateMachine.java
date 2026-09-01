@@ -12,26 +12,48 @@ public class TradeStateMachine {
 
     public void reconcileToBought() {
 
+        TradeState current =
+                state.get();
+
+        if (current != TradeState.UNKNOWN
+                && current != TradeState.BUY_SUBMITTED) {
+
+            throw new IllegalStateException(
+                    "Invalid reconcile transition to BOUGHT from "
+                            + current
+            );
+        }
+
         if (!state.compareAndSet(
-                TradeState.UNKNOWN,
+                current,
                 TradeState.BOUGHT
         )) {
             throw new IllegalStateException(
-                    "Invalid reconcile transition to BOUGHT from "
-                            + state.get()
+                    "Concurrent state change during reconciliation"
             );
         }
     }
 
     public void reconcileToReady() {
 
+        TradeState current =
+                state.get();
+
+        if (current != TradeState.UNKNOWN
+                && current != TradeState.BUY_SUBMITTED) {
+
+            throw new IllegalStateException(
+                    "Invalid reconcile transition to READY from "
+                            + current
+            );
+        }
+
         if (!state.compareAndSet(
-                TradeState.UNKNOWN,
+                current,
                 TradeState.READY
         )) {
             throw new IllegalStateException(
-                    "Invalid reconcile transition to READY from "
-                            + state.get()
+                    "Concurrent state change during reconciliation"
             );
         }
     }
@@ -98,4 +120,31 @@ public class TradeStateMachine {
             );
         }
     }
+
+    public void reconcileToUnknown() {
+
+        TradeState current =
+                state.get();
+
+        if (current == TradeState.UNKNOWN) {
+            return;
+        }
+
+        if (current != TradeState.BUY_SUBMITTED) {
+            throw new IllegalStateException(
+                    "Invalid reconcile transition to UNKNOWN from "
+                            + current
+            );
+        }
+
+        if (!state.compareAndSet(
+                TradeState.BUY_SUBMITTED,
+                TradeState.UNKNOWN
+        )) {
+            throw new IllegalStateException(
+                    "Concurrent state change during reconciliation"
+            );
+        }
+    }
+
 }
