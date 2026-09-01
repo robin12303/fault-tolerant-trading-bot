@@ -2,6 +2,7 @@ package com.tradingbot.backend.trade.exchange;
 
 import com.tradingbot.backend.trade.exchange.config.BinanceApiProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -11,6 +12,7 @@ import java.time.ZoneOffset;
 import com.tradingbot.backend.trade.exchange.dto.BinanceAccountResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 
@@ -20,6 +22,115 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BinanceAccountClientTest {
+
+    @Test
+    void tooManyRequestsThrowsException() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(
+                        requestTo(
+                                org.hamcrest.Matchers.containsString(
+                                        "/api/v3/account"
+                                )
+                        )
+                )
+                .andRespond(
+                        withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                );
+
+        BinanceAccountClient client =
+                new BinanceAccountClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        assertThrows(
+                RestClientResponseException.class,
+                client::getAccount
+        );
+
+        server.verify();
+    }
+
+    @Test
+    void unauthorizedResponseThrowsException() {
+
+        RestClient.Builder builder =
+                RestClient.builder();
+
+        MockRestServiceServer server =
+                MockRestServiceServer
+                        .bindTo(builder)
+                        .build();
+
+        BinanceApiProperties properties =
+                new BinanceApiProperties(
+                        "test-key",
+                        "test-secret"
+                );
+
+        BinanceRequestSigner signer =
+                new BinanceRequestSigner();
+
+        Clock clock =
+                Clock.fixed(
+                        Instant.parse("2026-09-01T09:00:00Z"),
+                        ZoneOffset.UTC
+                );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString(
+                        "/api/v3/account"
+                )))
+                .andRespond(
+                        withStatus(HttpStatus.UNAUTHORIZED)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body("""
+                            {
+                              "code": -2015,
+                              "msg": "Invalid API-key, IP, or permissions for action."
+                            }
+                            """)
+                );
+
+        BinanceAccountClient client =
+                new BinanceAccountClient(
+                        builder,
+                        properties,
+                        signer,
+                        clock
+                );
+
+        assertThrows(
+                RestClientResponseException.class,
+                client::getAccount
+        );
+
+        server.verify();
+    }
 
     @Test
     void missingCredentialsRejectAccountRequest() {
