@@ -5,17 +5,20 @@ import com.tradingbot.backend.trade.exchange.dto.BinanceAccountResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
+
 @Component
 public class BinanceAccountClient {
 
     private final RestClient restClient;
     private final BinanceApiProperties properties;
     private final BinanceRequestSigner signer;
-
+    private final Clock clock;
     public BinanceAccountClient(
             RestClient.Builder builder,
             BinanceApiProperties properties,
-            BinanceRequestSigner signer
+            BinanceRequestSigner signer,
+            Clock clock
     ) {
         this.restClient = builder
                 .baseUrl("https://api.binance.com")
@@ -23,6 +26,7 @@ public class BinanceAccountClient {
 
         this.properties = properties;
         this.signer = signer;
+        this.clock = clock;
     }
 
     public BinanceAccountResponse getAccount() {
@@ -37,7 +41,7 @@ public class BinanceAccountClient {
             );
         }
 
-        long timestamp = System.currentTimeMillis();
+        long timestamp = clock.millis();
         long recvWindow = 5000;
 
         String payload =
