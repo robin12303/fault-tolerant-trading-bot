@@ -1,0 +1,7 @@
+spring:
+  jpa:
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    validate-migration-naming: true
