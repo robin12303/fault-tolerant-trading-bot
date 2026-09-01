@@ -1,14 +1,63 @@
 package com.tradingbot.backend.trade.recovery;
 
+import com.tradingbot.backend.trade.exchange.config.TradingSafetyProperties;
+import com.tradingbot.backend.trade.fsm.BotState;
 import com.tradingbot.backend.trade.fsm.BotStateMachine;
 import com.tradingbot.backend.trade.position.PositionStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationArguments;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class StartupRecoveryTest {
+
+    @Test
+    void nonDedicatedAccountEndsStartupInHaltedState() throws Exception {
+
+        PositionStore positionStore =
+                mock(PositionStore.class);
+
+        StartupReconciliationChecker checker =
+                mock(StartupReconciliationChecker.class);
+
+        BotStateMachine botStateMachine =
+                new BotStateMachine();
+
+        TradingSafetyProperties safetyProperties =
+                new TradingSafetyProperties(false);
+
+        StartupReconciliationService reconciliationService =
+                new StartupReconciliationService(
+                        botStateMachine,
+                        checker,
+                        safetyProperties
+                );
+
+        StartupRecovery startupRecovery =
+                new StartupRecovery(
+                        positionStore,
+                        botStateMachine,
+                        reconciliationService
+                );
+
+        ApplicationArguments args =
+                mock(ApplicationArguments.class);
+
+        startupRecovery.run(args);
+
+        assertEquals(
+                BotState.HALTED,
+                botStateMachine.getState()
+        );
+
+        verify(positionStore).loadFromDatabase();
+
+        verify(checker, never())
+                .check();
+    }
+
     @Test
     void successfulRecoveryLoadsDatabaseAndReconciles() throws Exception {
 
