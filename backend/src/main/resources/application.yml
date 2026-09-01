@@ -5,3 +5,13 @@ spring:
   flyway:
     enabled: true
     validate-migration-naming: true
+
+binance:
+  api:
+    key: ${BINANCE_API_KEY:}
+    secret: ${BINANCE_API_SECRET:}
+
+trading:
+  symbols:
+    - ETHUSDT
+    - BTCUSDT
