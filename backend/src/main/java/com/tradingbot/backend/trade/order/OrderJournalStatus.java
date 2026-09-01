@@ -1,12 +1,20 @@
 package com.tradingbot.backend.trade.order;
 
 public enum OrderJournalStatus {
+
     PENDING_SUBMISSION,
+
     ACCEPTED,
-    REJECTED,
     RATE_LIMITED,
     UNKNOWN,
+
+    NEW,
     PARTIALLY_FILLED,
     FILLED,
-    CANCELED
+    CANCELED,
+    REJECTED,
+    EXPIRED,
+    EXPIRED_IN_MATCH,
+
+    NOT_FOUND
 }

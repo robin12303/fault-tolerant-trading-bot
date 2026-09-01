@@ -153,4 +153,159 @@ public class OrderEntity {
 
         this.updatedAt = now;
     }
+
+    public void applyExchangeSnapshot(
+            ExchangeOrderSnapshot snapshot,
+            LocalDateTime now
+    ) {
+
+        if (snapshot == null) {
+            throw new IllegalArgumentException(
+                    "Exchange order snapshot must not be null"
+            );
+        }
+
+        if (!clientOrderId.equals(
+                snapshot.clientOrderId()
+        )) {
+            throw new IllegalStateException(
+                    "clientOrderId mismatch"
+            );
+        }
+
+        if (!symbol.equals(
+                snapshot.symbol()
+        )) {
+            throw new IllegalStateException(
+                    "symbol mismatch"
+            );
+        }
+
+        if (snapshot.executedQty() == null
+                || snapshot.executedQty()
+                .compareTo(BigDecimal.ZERO) < 0) {
+
+            throw new IllegalStateException(
+                    "Invalid executed quantity"
+            );
+        }
+
+        if (snapshot.exchangeOrderId() != null) {
+
+            if (exchangeOrderId != null
+                    && !exchangeOrderId.equals(
+                    snapshot.exchangeOrderId()
+            )) {
+
+                throw new IllegalStateException(
+                        "exchangeOrderId mismatch"
+                );
+            }
+
+            exchangeOrderId =
+                    snapshot.exchangeOrderId();
+        }
+
+        switch (snapshot.status()) {
+
+            case NEW -> {
+                status =
+                        OrderJournalStatus.NEW;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case PARTIALLY_FILLED -> {
+
+                if (snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO) <= 0) {
+
+                    throw new IllegalStateException(
+                            "PARTIALLY_FILLED must have positive executedQty"
+                    );
+                }
+
+                status =
+                        OrderJournalStatus.PARTIALLY_FILLED;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case FILLED -> {
+
+                if (snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO) <= 0) {
+
+                    throw new IllegalStateException(
+                            "FILLED must have positive executedQty"
+                    );
+                }
+
+                status =
+                        OrderJournalStatus.FILLED;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case CANCELED -> {
+                status =
+                        OrderJournalStatus.CANCELED;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case REJECTED -> {
+
+                if (snapshot.executedQty()
+                        .compareTo(BigDecimal.ZERO) != 0) {
+
+                    throw new IllegalStateException(
+                            "REJECTED must have zero executedQty"
+                    );
+                }
+
+                status =
+                        OrderJournalStatus.REJECTED;
+
+                executedQty =
+                        BigDecimal.ZERO;
+            }
+
+            case EXPIRED -> {
+                status =
+                        OrderJournalStatus.EXPIRED;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case EXPIRED_IN_MATCH -> {
+                status =
+                        OrderJournalStatus.EXPIRED_IN_MATCH;
+
+                executedQty =
+                        snapshot.executedQty();
+            }
+
+            case NOT_FOUND -> {
+                status =
+                        OrderJournalStatus.NOT_FOUND;
+
+                // 기존 exchangeOrderId / executedQty는 지우지 않는다.
+            }
+
+            case UNKNOWN -> {
+                status =
+                        OrderJournalStatus.UNKNOWN;
+
+                // 기존 exchangeOrderId / executedQty는 지우지 않는다.
+            }
+        }
+
+        updatedAt = now;
+    }
 }

@@ -124,8 +124,54 @@ public class OrderJournalService {
                                 OrderJournalStatus.PENDING_SUBMISSION,
                                 OrderJournalStatus.ACCEPTED,
                                 OrderJournalStatus.RATE_LIMITED,
-                                OrderJournalStatus.UNKNOWN
+                                OrderJournalStatus.UNKNOWN,
+                                OrderJournalStatus.NEW,
+                                OrderJournalStatus.PARTIALLY_FILLED,
+                                OrderJournalStatus.NOT_FOUND
                         )
                 );
+    }
+    @Transactional(
+            propagation = Propagation.REQUIRES_NEW
+    )
+    public OrderEntity recordExchangeSnapshot(
+            String clientOrderId,
+            ExchangeOrderSnapshot snapshot
+    ) {
+
+        if (clientOrderId == null
+                || clientOrderId.isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "clientOrderId must not be blank"
+            );
+        }
+
+        OrderEntity order =
+                orderRepository
+                        .findByClientOrderId(
+                                clientOrderId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Order journal not found: "
+                                                        + clientOrderId
+                                        )
+                        );
+
+        LocalDateTime now =
+                LocalDateTime.ofInstant(
+                        clock.instant(),
+                        ZoneOffset.UTC
+                );
+
+        order.applyExchangeSnapshot(
+                snapshot,
+                now
+        );
+
+        return orderRepository
+                .saveAndFlush(order);
     }
 }

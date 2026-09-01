@@ -19,8 +19,16 @@ class StartupRecoveryTest {
         PositionStore positionStore =
                 mock(PositionStore.class);
 
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
 
         when(checker.check())
                 .thenReturn(
@@ -36,6 +44,7 @@ class StartupRecoveryTest {
         StartupReconciliationService reconciliationService =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
                         safetyProperties
                 );
@@ -57,8 +66,14 @@ class StartupRecoveryTest {
                 botStateMachine.getState()
         );
 
-        verify(positionStore).loadFromDatabase();
-        verify(checker).check();
+        verify(positionStore)
+                .loadFromDatabase();
+
+        verify(orderRecoveryService)
+                .recover();
+
+        verify(checker)
+                .check();
     }
 
     @Test
@@ -66,6 +81,9 @@ class StartupRecoveryTest {
 
         PositionStore positionStore =
                 mock(PositionStore.class);
+
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
 
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
@@ -79,6 +97,7 @@ class StartupRecoveryTest {
         StartupReconciliationService reconciliationService =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
                         safetyProperties
                 );
@@ -100,10 +119,13 @@ class StartupRecoveryTest {
                 botStateMachine.getState()
         );
 
-        verify(positionStore).loadFromDatabase();
+        verify(positionStore)
+                .loadFromDatabase();
 
-        verify(checker, never())
-                .check();
+        verifyNoInteractions(
+                orderRecoveryService,
+                checker
+        );
     }
 
     @Test
@@ -130,11 +152,14 @@ class StartupRecoveryTest {
 
         startupRecovery.run(args);
 
-        verify(positionStore).loadFromDatabase();
+        verify(positionStore)
+                .loadFromDatabase();
 
-        verify(reconciliationService).reconcile();
+        verify(reconciliationService)
+                .reconcile();
 
-        verify(botStateMachine, never()).halt();
+        verify(botStateMachine, never())
+                .halt();
     }
 
     @Test
@@ -159,7 +184,11 @@ class StartupRecoveryTest {
                         reconciliationService
                 );
 
-        doThrow(new RuntimeException("DB recovery failed"))
+        doThrow(
+                new RuntimeException(
+                        "DB recovery failed"
+                )
+        )
                 .when(positionStore)
                 .loadFromDatabase();
 
@@ -168,11 +197,12 @@ class StartupRecoveryTest {
                 () -> startupRecovery.run(args)
         );
 
-        verify(botStateMachine).halt();
+        verify(botStateMachine)
+                .halt();
+
         verify(reconciliationService, never())
                 .reconcile();
     }
-
 
     @Test
     void failedReconciliationHaltsBot() {
@@ -196,7 +226,11 @@ class StartupRecoveryTest {
                         reconciliationService
                 );
 
-        doThrow(new RuntimeException("Reconciliation failed"))
+        doThrow(
+                new RuntimeException(
+                        "Reconciliation failed"
+                )
+        )
                 .when(reconciliationService)
                 .reconcile();
 
@@ -205,11 +239,13 @@ class StartupRecoveryTest {
                 () -> startupRecovery.run(args)
         );
 
-        verify(positionStore).loadFromDatabase();
+        verify(positionStore)
+                .loadFromDatabase();
 
-        verify(reconciliationService).reconcile();
+        verify(reconciliationService)
+                .reconcile();
 
-        verify(botStateMachine).halt();
+        verify(botStateMachine)
+                .halt();
     }
-
 }

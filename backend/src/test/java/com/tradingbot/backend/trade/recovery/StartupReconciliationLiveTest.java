@@ -20,8 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @Tag("live")
 class StartupReconciliationLiveTest {
@@ -83,12 +82,25 @@ class StartupReconciliationLiveTest {
                         exchangeProvider
                 );
 
+        /*
+         * 이 테스트는 실제 Binance position reconciliation
+         * 검증이 목적이므로 order recovery는 mock 처리.
+         */
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
+
         BotStateMachine stateMachine =
                 new BotStateMachine();
 
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         stateMachine,
+                        orderRecoveryService,
                         checker,
                         new TradingSafetyProperties(true)
                 );
@@ -99,5 +111,8 @@ class StartupReconciliationLiveTest {
                 BotState.ACTIVE,
                 stateMachine.getState()
         );
+
+        verify(orderRecoveryService)
+                .recover();
     }
 }

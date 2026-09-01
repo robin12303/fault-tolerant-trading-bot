@@ -9,44 +9,55 @@ import static org.mockito.Mockito.*;
 class StartupReconciliationServiceTest {
 
     @Test
-    void nonDedicatedAccountHaltsWithoutReconciliation() {
+    void nonDedicatedAccountHaltsWithoutRecovery() {
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
 
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
-
-        TradingSafetyProperties safetyProperties =
-                new TradingSafetyProperties(false);
 
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
-                        safetyProperties
+                        new TradingSafetyProperties(false)
                 );
 
         service.reconcile();
 
-        verify(botStateMachine).halt();
+        verify(botStateMachine)
+                .halt();
 
         verify(botStateMachine, never())
                 .activate();
 
-        verify(checker, never())
-                .check();
+        verifyNoInteractions(
+                orderRecoveryService,
+                checker
+        );
     }
 
-
     @Test
-    void consistentResultActivatesBot() {
+    void consistentOrderAndPositionActivatesBot() {
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
 
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
 
         when(checker.check())
                 .thenReturn(
@@ -56,27 +67,122 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
                         new TradingSafetyProperties(true)
                 );
+
         service.reconcile();
 
-        verify(checker).check();
+        verify(orderRecoveryService)
+                .recover();
 
-        verify(botStateMachine).activate();
+        verify(checker)
+                .check();
+
+        verify(botStateMachine)
+                .activate();
 
         verify(botStateMachine, never())
                 .halt();
     }
 
     @Test
-    void inconsistentResultHaltsBot() {
+    void inconsistentOrderHaltsBeforePositionCheck() {
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
 
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.INCONSISTENT
+                );
+
+        StartupReconciliationService service =
+                new StartupReconciliationService(
+                        botStateMachine,
+                        orderRecoveryService,
+                        checker,
+                        new TradingSafetyProperties(true)
+                );
+
+        service.reconcile();
+
+        verify(orderRecoveryService)
+                .recover();
+
+        verify(checker, never())
+                .check();
+
+        verify(botStateMachine)
+                .halt();
+
+        verify(botStateMachine, never())
+                .activate();
+    }
+
+    @Test
+    void unavailableOrderRecoveryHaltsBeforePositionCheck() {
+
+        BotStateMachine botStateMachine =
+                mock(BotStateMachine.class);
+
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
+        StartupReconciliationChecker checker =
+                mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.UNAVAILABLE
+                );
+
+        StartupReconciliationService service =
+                new StartupReconciliationService(
+                        botStateMachine,
+                        orderRecoveryService,
+                        checker,
+                        new TradingSafetyProperties(true)
+                );
+
+        service.reconcile();
+
+        verify(orderRecoveryService)
+                .recover();
+
+        verify(checker, never())
+                .check();
+
+        verify(botStateMachine)
+                .halt();
+
+        verify(botStateMachine, never())
+                .activate();
+    }
+
+    @Test
+    void inconsistentPositionHaltsBot() {
+
+        BotStateMachine botStateMachine =
+                mock(BotStateMachine.class);
+
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
+        StartupReconciliationChecker checker =
+                mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
 
         when(checker.check())
                 .thenReturn(
@@ -86,27 +192,42 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
                         new TradingSafetyProperties(true)
                 );
+
         service.reconcile();
 
-        verify(checker).check();
+        verify(orderRecoveryService)
+                .recover();
 
-        verify(botStateMachine).halt();
+        verify(checker)
+                .check();
+
+        verify(botStateMachine)
+                .halt();
 
         verify(botStateMachine, never())
                 .activate();
     }
 
     @Test
-    void unavailableResultHaltsBot() {
+    void unavailablePositionCheckHaltsBot() {
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
 
+        OrderRecoveryService orderRecoveryService =
+                mock(OrderRecoveryService.class);
+
         StartupReconciliationChecker checker =
                 mock(StartupReconciliationChecker.class);
+
+        when(orderRecoveryService.recover())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
 
         when(checker.check())
                 .thenReturn(
@@ -116,15 +237,21 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
+                        orderRecoveryService,
                         checker,
                         new TradingSafetyProperties(true)
                 );
 
         service.reconcile();
 
-        verify(checker).check();
+        verify(orderRecoveryService)
+                .recover();
 
-        verify(botStateMachine).halt();
+        verify(checker)
+                .check();
+
+        verify(botStateMachine)
+                .halt();
 
         verify(botStateMachine, never())
                 .activate();

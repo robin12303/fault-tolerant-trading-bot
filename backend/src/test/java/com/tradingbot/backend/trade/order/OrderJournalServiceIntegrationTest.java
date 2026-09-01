@@ -181,4 +181,121 @@ class OrderJournalServiceIntegrationTest {
                         )
         );
     }
+
+    @Test
+    void unknownSnapshotDoesNotEraseKnownExchangeOrderId() {
+
+        String clientOrderId =
+                "integration-unknown-preserve-1";
+
+        OrderRequest request =
+                new OrderRequest(
+                        "ETHUSDT",
+                        OrderSide.BUY,
+                        new BigDecimal("20.00"),
+                        clientOrderId
+                );
+
+        orderJournalService.recordPending(
+                request
+        );
+
+        orderJournalService.recordSubmissionResult(
+                clientOrderId,
+                new OrderSubmissionResult(
+                        OrderSubmissionStatus.ACCEPTED,
+                        clientOrderId,
+                        12345L
+                )
+        );
+
+        orderJournalService.recordExchangeSnapshot(
+                clientOrderId,
+                new ExchangeOrderSnapshot(
+                        "ETHUSDT",
+                        clientOrderId,
+                        null,
+                        ExchangeOrderStatus.UNKNOWN,
+                        BigDecimal.ZERO
+                )
+        );
+
+        OrderEntity saved =
+                orderRepository
+                        .findByClientOrderId(
+                                clientOrderId
+                        )
+                        .orElseThrow();
+
+        assertEquals(
+                OrderJournalStatus.UNKNOWN,
+                saved.getStatus()
+        );
+
+        assertEquals(
+                12345L,
+                saved.getExchangeOrderId()
+        );
+
+        assertEquals(
+                0,
+                saved.getExecutedQty()
+                        .compareTo(BigDecimal.ZERO)
+        );
+    }
+
+    @Test
+    void partialFillSnapshotIsPersisted() {
+
+        String clientOrderId =
+                "integration-partial-1";
+
+        OrderRequest request =
+                new OrderRequest(
+                        "ETHUSDT",
+                        OrderSide.BUY,
+                        new BigDecimal("20.00"),
+                        clientOrderId
+                );
+
+        orderJournalService.recordPending(
+                request
+        );
+
+        orderJournalService.recordExchangeSnapshot(
+                clientOrderId,
+                new ExchangeOrderSnapshot(
+                        "ETHUSDT",
+                        clientOrderId,
+                        98765L,
+                        ExchangeOrderStatus.PARTIALLY_FILLED,
+                        new BigDecimal("0.003")
+                )
+        );
+
+        OrderEntity saved =
+                orderRepository
+                        .findByClientOrderId(
+                                clientOrderId
+                        )
+                        .orElseThrow();
+
+        assertEquals(
+                OrderJournalStatus.PARTIALLY_FILLED,
+                saved.getStatus()
+        );
+
+        assertEquals(
+                98765L,
+                saved.getExchangeOrderId()
+        );
+
+        assertEquals(
+                0,
+                saved.getExecutedQty()
+                        .compareTo(
+                                new BigDecimal("0.003")
+                        )
+        );
+    }
 }
