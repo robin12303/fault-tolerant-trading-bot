@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.EnumSet;
+import java.util.List;
 
 @Service
 public class OrderJournalService {
@@ -111,5 +113,19 @@ public class OrderJournalService {
                 );
 
         return orderRepository.saveAndFlush(order);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderEntity> findRecoverableOrders() {
+
+        return orderRepository
+                .findByStatusInOrderByCreatedAtAsc(
+                        EnumSet.of(
+                                OrderJournalStatus.PENDING_SUBMISSION,
+                                OrderJournalStatus.ACCEPTED,
+                                OrderJournalStatus.RATE_LIMITED,
+                                OrderJournalStatus.UNKNOWN
+                        )
+                );
     }
 }
