@@ -15,3 +15,6 @@ trading:
   symbols:
     - ETHUSDT
     - BTCUSDT
+
+  safety:
+    dedicated-account: false

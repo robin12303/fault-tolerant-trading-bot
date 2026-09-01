@@ -1,11 +1,43 @@
 package com.tradingbot.backend.trade.recovery;
 
+import com.tradingbot.backend.trade.exchange.config.TradingSafetyProperties;
 import com.tradingbot.backend.trade.fsm.BotStateMachine;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.*;
 
 class StartupReconciliationServiceTest {
+
+    @Test
+    void nonDedicatedAccountHaltsWithoutReconciliation() {
+
+        BotStateMachine botStateMachine =
+                mock(BotStateMachine.class);
+
+        StartupReconciliationChecker checker =
+                mock(StartupReconciliationChecker.class);
+
+        TradingSafetyProperties safetyProperties =
+                new TradingSafetyProperties(false);
+
+        StartupReconciliationService service =
+                new StartupReconciliationService(
+                        botStateMachine,
+                        checker,
+                        safetyProperties
+                );
+
+        service.reconcile();
+
+        verify(botStateMachine).halt();
+
+        verify(botStateMachine, never())
+                .activate();
+
+        verify(checker, never())
+                .check();
+    }
+
 
     @Test
     void consistentResultActivatesBot() {
@@ -24,9 +56,9 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
-                        checker
+                        checker,
+                        new TradingSafetyProperties(true)
                 );
-
         service.reconcile();
 
         verify(checker).check();
@@ -54,9 +86,9 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
-                        checker
+                        checker,
+                        new TradingSafetyProperties(true)
                 );
-
         service.reconcile();
 
         verify(checker).check();
@@ -84,7 +116,8 @@ class StartupReconciliationServiceTest {
         StartupReconciliationService service =
                 new StartupReconciliationService(
                         botStateMachine,
-                        checker
+                        checker,
+                        new TradingSafetyProperties(true)
                 );
 
         service.reconcile();
