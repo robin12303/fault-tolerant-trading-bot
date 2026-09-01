@@ -14,6 +14,54 @@ import static org.mockito.Mockito.*;
 class StartupRecoveryTest {
 
     @Test
+    void dedicatedAccountWithConsistentStateBecomesActive() throws Exception {
+
+        PositionStore positionStore =
+                mock(PositionStore.class);
+
+        StartupReconciliationChecker checker =
+                mock(StartupReconciliationChecker.class);
+
+        when(checker.check())
+                .thenReturn(
+                        StartupReconciliationResult.CONSISTENT
+                );
+
+        BotStateMachine botStateMachine =
+                new BotStateMachine();
+
+        TradingSafetyProperties safetyProperties =
+                new TradingSafetyProperties(true);
+
+        StartupReconciliationService reconciliationService =
+                new StartupReconciliationService(
+                        botStateMachine,
+                        checker,
+                        safetyProperties
+                );
+
+        StartupRecovery startupRecovery =
+                new StartupRecovery(
+                        positionStore,
+                        botStateMachine,
+                        reconciliationService
+                );
+
+        ApplicationArguments args =
+                mock(ApplicationArguments.class);
+
+        startupRecovery.run(args);
+
+        assertEquals(
+                BotState.ACTIVE,
+                botStateMachine.getState()
+        );
+
+        verify(positionStore).loadFromDatabase();
+        verify(checker).check();
+    }
+
+    @Test
     void nonDedicatedAccountEndsStartupInHaltedState() throws Exception {
 
         PositionStore positionStore =
