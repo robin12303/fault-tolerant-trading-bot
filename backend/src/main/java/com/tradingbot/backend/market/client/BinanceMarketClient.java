@@ -5,7 +5,7 @@ import com.tradingbot.backend.market.dto.BinanceKline;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-
+import com.tradingbot.backend.market.dto.BinanceExchangeInfoResponse;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -31,14 +31,24 @@ public class BinanceMarketClient {
                 .body(BinancePriceResponse.class);
     }
 
-    public String getExchangeInfo(String symbol) {
-        return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/v3/exchangeInfo")
-                        .queryParam("symbol", symbol)
-                        .build())
-                .retrieve()
-                .body(String.class);
+    public BinanceExchangeInfoResponse getExchangeInfo(String symbol) {
+
+        BinanceExchangeInfoResponse response =
+                restClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .path("/api/v3/exchangeInfo")
+                                .queryParam("symbol", symbol)
+                                .build())
+                        .retrieve()
+                        .body(BinanceExchangeInfoResponse.class);
+
+        if (response == null || response.symbols() == null) {
+            throw new IllegalStateException(
+                    "Binance exchange info response is invalid"
+            );
+        }
+
+        return response;
     }
 
     public List<BinanceKline> getDailyKlines(String symbol, int limit) {

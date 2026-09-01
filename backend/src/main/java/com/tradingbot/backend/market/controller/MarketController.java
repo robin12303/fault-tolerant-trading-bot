@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import com.tradingbot.backend.market.dto.BinanceExchangeInfoResponse;
 import java.util.List;
 
 @RestController
@@ -28,7 +28,7 @@ public class MarketController {
     }
 
     @GetMapping("/exchange-info")
-    public String getExchangeInfo(
+    public BinanceExchangeInfoResponse getExchangeInfo(
             @RequestParam(defaultValue = "ETHUSDT") String symbol
     ) {
         return binanceMarketClient.getExchangeInfo(symbol);

@@ -1,10 +1,12 @@
 package com.tradingbot.backend.trade.exchange;
 
+import com.tradingbot.backend.market.client.BinanceMarketClient;
 import com.tradingbot.backend.trade.exchange.config.TradingSymbolsProperties;
 import com.tradingbot.backend.trade.exchange.dto.BinanceAccountResponse;
 import com.tradingbot.backend.trade.exchange.dto.BinanceBalance;
 import org.junit.jupiter.api.Test;
-
+import com.tradingbot.backend.market.dto.BinanceExchangeInfoResponse;
+import com.tradingbot.backend.market.dto.BinanceSymbolInfo;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -13,13 +15,75 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class BinanceExchangePositionProviderTest {
+    @Test
+    void usesExchangeInfoToResolveBaseAsset() {
 
+        BinanceAccountClient accountClient =
+                mock(BinanceAccountClient.class);
+
+        BinanceMarketClient marketClient =
+                mock(BinanceMarketClient.class);
+
+        TradingSymbolsProperties symbols =
+                new TradingSymbolsProperties(
+                        List.of("ETHBTC")
+                );
+
+        BinanceAccountResponse account =
+                new BinanceAccountResponse(
+                        List.of(
+                                new BinanceBalance(
+                                        "ETH",
+                                        new BigDecimal("0.02"),
+                                        new BigDecimal("0.01")
+                                )
+                        )
+                );
+
+        when(accountClient.getAccount())
+                .thenReturn(account);
+
+        when(marketClient.getExchangeInfo("ETHBTC"))
+                .thenReturn(
+                        new BinanceExchangeInfoResponse(
+                                List.of(
+                                        new BinanceSymbolInfo(
+                                                "ETHBTC",
+                                                "ETH",
+                                                "BTC"
+                                        )
+                                )
+                        )
+                );
+
+        BinanceExchangePositionProvider provider =
+                new BinanceExchangePositionProvider(
+                        accountClient,
+                        symbols,
+                        marketClient
+                );
+
+        Map<String, BigDecimal> result =
+                provider.getPositions();
+
+        assertEquals(
+                0,
+                result.get("ETHBTC")
+                        .compareTo(new BigDecimal("0.03"))
+        );
+
+        verify(marketClient)
+                .getExchangeInfo("ETHBTC");
+    }
 
     @Test
     void nullBalancesThrowsException() {
 
         BinanceAccountClient accountClient =
                 mock(BinanceAccountClient.class);
+
+        BinanceMarketClient marketClient =
+                mock(BinanceMarketClient.class);
 
         TradingSymbolsProperties symbols =
                 new TradingSymbolsProperties(
@@ -35,7 +99,8 @@ class BinanceExchangePositionProviderTest {
         BinanceExchangePositionProvider provider =
                 new BinanceExchangePositionProvider(
                         accountClient,
-                        symbols
+                        symbols,
+                        marketClient
                 );
 
         assertThrows(
@@ -55,6 +120,9 @@ class BinanceExchangePositionProviderTest {
                         List.of("ETHUSDT")
                 );
 
+        BinanceMarketClient marketClient =
+                mock(BinanceMarketClient.class);
+
         BinanceAccountResponse account =
                 new BinanceAccountResponse(
                         List.of(
@@ -69,10 +137,24 @@ class BinanceExchangePositionProviderTest {
         when(accountClient.getAccount())
                 .thenReturn(account);
 
+        when(marketClient.getExchangeInfo("ETHUSDT"))
+                .thenReturn(
+                        new BinanceExchangeInfoResponse(
+                                List.of(
+                                        new BinanceSymbolInfo(
+                                                "ETHUSDT",
+                                                "ETH",
+                                                "USDT"
+                                        )
+                                )
+                        )
+                );
+
         BinanceExchangePositionProvider provider =
                 new BinanceExchangePositionProvider(
                         accountClient,
-                        symbols
+                        symbols,
+                        marketClient
                 );
 
         Map<String, BigDecimal> result =
@@ -86,6 +168,9 @@ class BinanceExchangePositionProviderTest {
 
         BinanceAccountClient accountClient =
                 mock(BinanceAccountClient.class);
+
+        BinanceMarketClient marketClient =
+                mock(BinanceMarketClient.class);
 
         TradingSymbolsProperties symbols =
                 new TradingSymbolsProperties(
@@ -119,10 +204,37 @@ class BinanceExchangePositionProviderTest {
         when(accountClient.getAccount())
                 .thenReturn(account);
 
+        when(marketClient.getExchangeInfo("ETHUSDT"))
+                .thenReturn(
+                        new BinanceExchangeInfoResponse(
+                                List.of(
+                                        new BinanceSymbolInfo(
+                                                "ETHUSDT",
+                                                "ETH",
+                                                "USDT"
+                                        )
+                                )
+                        )
+                );
+
+        when(marketClient.getExchangeInfo("BTCUSDT"))
+                .thenReturn(
+                        new BinanceExchangeInfoResponse(
+                                List.of(
+                                        new BinanceSymbolInfo(
+                                                "BTCUSDT",
+                                                "BTC",
+                                                "USDT"
+                                        )
+                                )
+                        )
+                );
+
         BinanceExchangePositionProvider provider =
                 new BinanceExchangePositionProvider(
                         accountClient,
-                        symbols
+                        symbols,
+                        marketClient
                 );
 
         Map<String, BigDecimal> result =

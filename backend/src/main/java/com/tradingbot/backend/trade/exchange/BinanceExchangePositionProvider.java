@@ -4,24 +4,29 @@ import com.tradingbot.backend.trade.exchange.config.TradingSymbolsProperties;
 import com.tradingbot.backend.trade.exchange.dto.BinanceAccountResponse;
 import com.tradingbot.backend.trade.recovery.ExchangePositionProvider;
 import org.springframework.stereotype.Component;
-
+import com.tradingbot.backend.market.client.BinanceMarketClient;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.tradingbot.backend.market.dto.BinanceExchangeInfoResponse;
+import com.tradingbot.backend.market.dto.BinanceSymbolInfo;
 @Component
 public class BinanceExchangePositionProvider
         implements ExchangePositionProvider {
 
     private final BinanceAccountClient accountClient;
     private final TradingSymbolsProperties tradingSymbolsProperties;
+    private final BinanceMarketClient marketClient;
 
     public BinanceExchangePositionProvider(
             BinanceAccountClient accountClient,
-            TradingSymbolsProperties tradingSymbolsProperties
+            TradingSymbolsProperties tradingSymbolsProperties,
+            BinanceMarketClient marketClient
     ) {
         this.accountClient = accountClient;
         this.tradingSymbolsProperties = tradingSymbolsProperties;
+        this.marketClient = marketClient;
     }
 
     @Override
@@ -40,18 +45,32 @@ public class BinanceExchangePositionProvider
                 new HashMap<>();
 
         for (String symbol : tradingSymbolsProperties.symbols()) {
+            BinanceExchangeInfoResponse exchangeInfo =
+                    marketClient.getExchangeInfo(symbol);
 
-            if (!symbol.endsWith("USDT")) {
+            BinanceSymbolInfo symbolInfo =
+                    exchangeInfo.symbols().stream()
+                            .filter(info ->
+                                    symbol.equals(info.symbol())
+                            )
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "Symbol not found in exchange info: "
+                                                    + symbol
+                                    )
+                            );
+
+            String baseAsset =
+                    symbolInfo.baseAsset();
+
+            if (baseAsset == null || baseAsset.isBlank()) {
                 throw new IllegalStateException(
-                        "Unsupported trading symbol: " + symbol
+                        "Base asset is missing for symbol: "
+                                + symbol
                 );
             }
 
-            String baseAsset =
-                    symbol.substring(
-                            0,
-                            symbol.length() - "USDT".length()
-                    );
 
             account.balances().stream()
                     .filter(balance ->
