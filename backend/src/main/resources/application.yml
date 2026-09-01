@@ -17,4 +17,4 @@ trading:
     - BTCUSDT
 
   safety:
-    dedicated-account: false
+    dedicated-account: ${TRADING_DEDICATED_ACCOUNT:false}

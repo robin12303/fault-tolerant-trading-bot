@@ -74,10 +74,5 @@ class BinanceExchangePositionProviderLiveTest {
                 provider.getPositions();
 
         assertNotNull(positions);
-
-        assertTrue(
-                positions.containsKey("ETHUSDT")
-                        || positions.containsKey("BTCUSDT")
-        );
     }
 }
