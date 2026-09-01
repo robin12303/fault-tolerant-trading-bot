@@ -2,19 +2,35 @@ package com.tradingbot.backend.trade.service;
 
 import com.tradingbot.backend.trade.fsm.TradeState;
 import com.tradingbot.backend.trade.fsm.TradeStateMachine;
-import com.tradingbot.backend.trade.order.MockExchangeOrderSnapshot;
-import com.tradingbot.backend.trade.order.MockExchangeOrderStatus;
+import com.tradingbot.backend.trade.order.ExchangeOrderSnapshot;
+import com.tradingbot.backend.trade.order.ExchangeOrderStatus;
+import com.tradingbot.backend.trade.order.OrderQueryClient;
 import com.tradingbot.backend.trade.position.PositionRepository;
 import com.tradingbot.backend.trade.position.PositionStore;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ReconciliationServiceTest {
+
+    private ExchangeOrderSnapshot snapshot(
+            ExchangeOrderStatus status,
+            BigDecimal executedQty
+    ) {
+        return new ExchangeOrderSnapshot(
+                "ETHUSDT",
+                "bot-123",
+                12345L,
+                status,
+                executedQty
+        );
+    }
 
     private TradeStateMachine createUnknownFsm() {
 
@@ -36,13 +52,16 @@ class ReconciliationServiceTest {
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.REJECTED,
+                        snapshot(
+                                ExchangeOrderStatus.REJECTED,
                                 new BigDecimal("0.01")
                         )
                 );
@@ -53,17 +72,19 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
         assertThrows(
                 IllegalStateException.class,
-                () -> service.reconcileBuy("ETHUSDT")
+                () -> service.reconcileBuy(
+                        "ETHUSDT",
+                        "bot-123"
+                )
         );
 
         assertEquals(
@@ -78,8 +99,8 @@ class ReconciliationServiceTest {
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -87,10 +108,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.FILLED,
+                        snapshot(
+                                ExchangeOrderStatus.FILLED,
                                 BigDecimal.ZERO
                         )
                 );
@@ -98,14 +122,16 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
-
                 );
 
         assertThrows(
                 IllegalStateException.class,
-                () -> service.reconcileBuy("ETHUSDT")
+                () -> service.reconcileBuy(
+                        "ETHUSDT",
+                        "bot-123"
+                )
         );
 
         assertEquals(
@@ -114,15 +140,14 @@ class ReconciliationServiceTest {
         );
     }
 
-
     @Test
     void filledOrderReconcilesToBought() {
 
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -130,10 +155,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.FILLED,
+                        snapshot(
+                                ExchangeOrderStatus.FILLED,
                                 new BigDecimal("0.05")
                         )
                 );
@@ -141,11 +169,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.BOUGHT,
@@ -160,15 +191,14 @@ class ReconciliationServiceTest {
         );
     }
 
-
     @Test
     void rejectedOrderReconcilesToReady() {
 
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -176,10 +206,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.REJECTED,
+                        snapshot(
+                                ExchangeOrderStatus.REJECTED,
                                 BigDecimal.ZERO
                         )
                 );
@@ -187,11 +220,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.READY,
@@ -204,12 +240,13 @@ class ReconciliationServiceTest {
     }
 
     @Test
-    void partiallyFilledWithZeroQtyThrowsException(){
+    void partiallyFilledWithZeroQtyThrowsException() {
+
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -217,11 +254,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.PARTIALLY_FILLED,
+                        snapshot(
+                                ExchangeOrderStatus.PARTIALLY_FILLED,
                                 BigDecimal.ZERO
                         )
                 );
@@ -229,14 +268,16 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService
-                        ,
+                        queryClient,
                         positionStore
                 );
 
         assertThrows(
                 IllegalStateException.class,
-                () -> service.reconcileBuy("ETHUSDT")
+                () -> service.reconcileBuy(
+                        "ETHUSDT",
+                        "bot-123"
+                )
         );
 
         assertEquals(
@@ -255,8 +296,8 @@ class ReconciliationServiceTest {
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -264,10 +305,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.CANCELED,
+                        snapshot(
+                                ExchangeOrderStatus.CANCELED,
                                 BigDecimal.ZERO
                         )
                 );
@@ -275,12 +319,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService
-                        ,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.READY,
@@ -293,20 +339,27 @@ class ReconciliationServiceTest {
     }
 
     @Test
-    void partiallyFilledStoresExposureAndStaysUnknown(){
+    void partiallyFilledStoresExposureAndStaysUnknown() {
+
         TradeStateMachine fsm =
                 createUnknownFsm();
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
+
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
 
         PositionStore positionStore =
                 new PositionStore(positionRepository);
-        when(queryService.queryBuyOrder("ETHUSDT"))
+
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.PARTIALLY_FILLED,
+                        snapshot(
+                                ExchangeOrderStatus.PARTIALLY_FILLED,
                                 new BigDecimal("0.03")
                         )
                 );
@@ -314,11 +367,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.UNKNOWN,
@@ -331,8 +387,6 @@ class ReconciliationServiceTest {
                         .getPosition("ETHUSDT")
                         .baseQty()
         );
-
-
     }
 
     @Test
@@ -341,8 +395,8 @@ class ReconciliationServiceTest {
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -350,10 +404,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.CANCELED,
+                        snapshot(
+                                ExchangeOrderStatus.CANCELED,
                                 new BigDecimal("0.02")
                         )
                 );
@@ -361,11 +418,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.UNKNOWN,
@@ -380,15 +440,14 @@ class ReconciliationServiceTest {
         );
     }
 
-
     @Test
     void notFoundOrderStaysUnknown() {
 
         TradeStateMachine fsm =
                 createUnknownFsm();
 
-        MockExchangeQueryService queryService =
-                mock(MockExchangeQueryService.class);
+        OrderQueryClient queryClient =
+                mock(OrderQueryClient.class);
 
         PositionRepository positionRepository =
                 mock(PositionRepository.class);
@@ -396,10 +455,13 @@ class ReconciliationServiceTest {
         PositionStore positionStore =
                 new PositionStore(positionRepository);
 
-        when(queryService.queryBuyOrder("ETHUSDT"))
+        when(queryClient.getOrder(
+                "ETHUSDT",
+                "bot-123"
+        ))
                 .thenReturn(
-                        new MockExchangeOrderSnapshot(
-                                MockExchangeOrderStatus.NOT_FOUND,
+                        snapshot(
+                                ExchangeOrderStatus.NOT_FOUND,
                                 BigDecimal.ZERO
                         )
                 );
@@ -407,11 +469,14 @@ class ReconciliationServiceTest {
         ReconciliationService service =
                 new ReconciliationService(
                         fsm,
-                        queryService,
+                        queryClient,
                         positionStore
                 );
 
-        service.reconcileBuy("ETHUSDT");
+        service.reconcileBuy(
+                "ETHUSDT",
+                "bot-123"
+        );
 
         assertEquals(
                 TradeState.UNKNOWN,

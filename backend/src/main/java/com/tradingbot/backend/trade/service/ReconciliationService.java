@@ -5,26 +5,30 @@ import com.tradingbot.backend.trade.fsm.TradeStateMachine;
 import com.tradingbot.backend.trade.order.MockExchangeOrderSnapshot;
 import com.tradingbot.backend.trade.position.PositionStore;
 import org.springframework.stereotype.Service;
-
+import com.tradingbot.backend.trade.order.ExchangeOrderSnapshot;
+import com.tradingbot.backend.trade.order.OrderQueryClient;
 import java.math.BigDecimal;
 
 @Service
 public class ReconciliationService {
 
     private final TradeStateMachine fsm;
-    private final MockExchangeQueryService exchangeQueryService;
+    private final OrderQueryClient orderQueryClient;
     private final PositionStore positionStore;
     public ReconciliationService(
             TradeStateMachine fsm,
-            MockExchangeQueryService exchangeQueryService,
+            OrderQueryClient orderQueryClient,
             PositionStore positionStore
     ) {
         this.fsm = fsm;
-        this.exchangeQueryService = exchangeQueryService;
+        this.orderQueryClient = orderQueryClient;
         this.positionStore = positionStore;
     }
 
-    public void reconcileBuy(String symbol) {
+    public void reconcileBuy(
+            String symbol,
+            String clientOrderId
+    ) {
 
         if (fsm.getState() != TradeState.UNKNOWN) {
             throw new IllegalStateException(
@@ -32,8 +36,11 @@ public class ReconciliationService {
             );
         }
 
-        MockExchangeOrderSnapshot order =
-                exchangeQueryService.queryBuyOrder(symbol);
+        ExchangeOrderSnapshot order =
+                orderQueryClient.getOrder(
+                        symbol,
+                        clientOrderId
+                );
 
         switch (order.status()) {
 
@@ -107,9 +114,13 @@ public class ReconciliationService {
                 // UNKNOWN 유지
             }
 
-            case NOT_FOUND, UNKNOWN -> {
-                // 아무것도 확정할 수 없음.
-                // UNKNOWN 유지.
+            case NEW,
+                 EXPIRED,
+                 EXPIRED_IN_MATCH,
+                 NOT_FOUND,
+                 UNKNOWN -> {
+                // 아직 안전하게 확정할 수 없음.
+                // FSM UNKNOWN 유지.
             }
         }
     }
