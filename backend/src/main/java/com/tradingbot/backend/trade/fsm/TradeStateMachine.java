@@ -85,4 +85,17 @@ public class TradeStateMachine {
             );
         }
     }
+
+    public void markBuySubmitted() {
+
+        if (!state.compareAndSet(
+                TradeState.BUYING,
+                TradeState.BUY_SUBMITTED
+        )) {
+            throw new IllegalStateException(
+                    "Invalid transition to BUY_SUBMITTED from "
+                            + state.get()
+            );
+        }
+    }
 }

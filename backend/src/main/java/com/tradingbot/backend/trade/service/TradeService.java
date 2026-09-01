@@ -2,28 +2,38 @@ package com.tradingbot.backend.trade.service;
 
 import com.tradingbot.backend.strategy.dto.EntrySignalResult;
 import com.tradingbot.backend.strategy.service.StrategyService;
+import com.tradingbot.backend.trade.exchange.config.TradingOrderProperties;
 import com.tradingbot.backend.trade.fsm.BotStateMachine;
-import com.tradingbot.backend.trade.fsm.TradeStateMachine;
-import com.tradingbot.backend.trade.order.MockOrderResult;
+import com.tradingbot.backend.trade.order.ClientOrderIdGenerator;
+import com.tradingbot.backend.trade.order.OrderRequest;
+import com.tradingbot.backend.trade.order.OrderSide;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TradeService {
 
     private final StrategyService strategyService;
-    private final TradeStateMachine fsm;
-    private final MockOrderService mockOrderService;
+    private final BuyOrderExecutionService buyOrderExecutionService;
+    private final ClientOrderIdGenerator clientOrderIdGenerator;
+    private final TradingOrderProperties orderProperties;
     private final BotStateMachine botStateMachine;
+
     public TradeService(
             StrategyService strategyService,
-            TradeStateMachine fsm,
-            MockOrderService mockOrderService,
+            BuyOrderExecutionService buyOrderExecutionService,
+            ClientOrderIdGenerator clientOrderIdGenerator,
+            TradingOrderProperties orderProperties,
             BotStateMachine botStateMachine
     ) {
         this.strategyService = strategyService;
-        this.fsm = fsm;
-        this.mockOrderService = mockOrderService;
-        this.botStateMachine = botStateMachine;
+        this.buyOrderExecutionService =
+                buyOrderExecutionService;
+        this.clientOrderIdGenerator =
+                clientOrderIdGenerator;
+        this.orderProperties =
+                orderProperties;
+        this.botStateMachine =
+                botStateMachine;
     }
 
     public void checkAndBuy(String symbol) {
@@ -39,34 +49,17 @@ public class TradeService {
             return;
         }
 
-        if (!fsm.tryStartBuying()) {
-            return;
-        }
+        String clientOrderId =
+                clientOrderIdGenerator.next();
 
-        try {
+        OrderRequest request =
+                new OrderRequest(
+                        symbol,
+                        OrderSide.BUY,
+                        orderProperties.buyQuoteQuantity(),
+                        clientOrderId
+                );
 
-            MockOrderResult result =
-                    mockOrderService.buy(symbol);
-
-            switch (result) {
-
-                case FILLED ->
-                        fsm.markBought();
-
-                case REJECTED ->
-                        fsm.markBuyRejected();
-
-                case TIMEOUT ->
-                        fsm.markBuyUnknown();
-            }
-
-        } catch (Exception e) {
-
-            // 예상하지 못한 오류도
-            // 주문 결과를 확정할 수 없다고 판단
-            fsm.markBuyUnknown();
-
-            throw e;
-        }
+        buyOrderExecutionService.submit(request);
     }
 }

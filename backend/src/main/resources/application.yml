@@ -18,3 +18,9 @@ trading:
 
   safety:
     dedicated-account: ${TRADING_DEDICATED_ACCOUNT:false}
+
+  execution:
+    enabled: ${TRADING_EXECUTION_ENABLED:false}
+
+  order:
+    buy-quote-quantity: ${TRADING_BUY_QUOTE_QUANTITY:20.00}

@@ -2,11 +2,13 @@ package com.tradingbot.backend.trade.service;
 
 import com.tradingbot.backend.strategy.dto.EntrySignalResult;
 import com.tradingbot.backend.strategy.service.StrategyService;
+import com.tradingbot.backend.trade.exchange.config.TradingOrderProperties;
 import com.tradingbot.backend.trade.fsm.BotStateMachine;
-import com.tradingbot.backend.trade.fsm.TradeState;
-import com.tradingbot.backend.trade.fsm.TradeStateMachine;
-import com.tradingbot.backend.trade.order.MockOrderResult;
+import com.tradingbot.backend.trade.order.ClientOrderIdGenerator;
+import com.tradingbot.backend.trade.order.OrderRequest;
+import com.tradingbot.backend.trade.order.OrderSide;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 
@@ -34,14 +36,19 @@ class TradeServiceTest {
         StrategyService strategyService =
                 mock(StrategyService.class);
 
-        TradeStateMachine fsm =
-                new TradeStateMachine();
+        BuyOrderExecutionService executionService =
+                mock(BuyOrderExecutionService.class);
 
-        MockOrderService orderService =
-                mock(MockOrderService.class);
+        ClientOrderIdGenerator idGenerator =
+                mock(ClientOrderIdGenerator.class);
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
+
+        TradingOrderProperties orderProperties =
+                new TradingOrderProperties(
+                        new BigDecimal("20.00")
+                );
 
         when(botStateMachine.isActive())
                 .thenReturn(false);
@@ -49,8 +56,9 @@ class TradeServiceTest {
         TradeService tradeService =
                 new TradeService(
                         strategyService,
-                        fsm,
-                        orderService,
+                        executionService,
+                        idGenerator,
+                        orderProperties,
                         botStateMachine
                 );
 
@@ -59,137 +67,13 @@ class TradeServiceTest {
         verify(strategyService, never())
                 .evaluate(anyString());
 
-        verify(orderService, never())
-                .buy(anyString());
-    }
-
-    @Test
-    void filledBuyBecomesBought() {
-
-        StrategyService strategyService =
-                mock(StrategyService.class);
-
-        MockOrderService orderService =
-                mock(MockOrderService.class);
-
-        TradeStateMachine fsm =
-                new TradeStateMachine();
-
-        BotStateMachine botStateMachine =
-                mock(BotStateMachine.class);
-
-        when(botStateMachine.isActive())
-                .thenReturn(true);
-
-        when(strategyService.evaluate("ETHUSDT"))
-                .thenReturn(trueSignal());
-
-        when(orderService.buy("ETHUSDT"))
-                .thenReturn(MockOrderResult.FILLED);
-
-        TradeService tradeService =
-                new TradeService(
-                        strategyService,
-                        fsm,
-                        orderService,
-                        botStateMachine
-                );
-
-        tradeService.checkAndBuy("ETHUSDT");
-
-        assertEquals(
-                TradeState.BOUGHT,
-                fsm.getState()
+        verifyNoInteractions(
+                executionService
         );
 
-        verify(orderService, times(1))
-                .buy("ETHUSDT");
-    }
-
-    @Test
-    void rejectedBuyReturnsToReady() {
-
-        StrategyService strategyService =
-                mock(StrategyService.class);
-
-        MockOrderService orderService =
-                mock(MockOrderService.class);
-
-        TradeStateMachine fsm =
-                new TradeStateMachine();
-
-        BotStateMachine botStateMachine =
-                mock(BotStateMachine.class);
-
-        when(botStateMachine.isActive())
-                .thenReturn(true);
-
-        when(strategyService.evaluate("ETHUSDT"))
-                .thenReturn(trueSignal());
-
-        when(orderService.buy("ETHUSDT"))
-                .thenReturn(MockOrderResult.REJECTED);
-
-        TradeService tradeService =
-                new TradeService(
-                        strategyService,
-                        fsm,
-                        orderService,
-                        botStateMachine
-                );
-
-        tradeService.checkAndBuy("ETHUSDT");
-
-        assertEquals(
-                TradeState.READY,
-                fsm.getState()
+        verifyNoInteractions(
+                idGenerator
         );
-
-        verify(orderService, times(1))
-                .buy("ETHUSDT");
-    }
-
-    @Test
-    void timeoutBuyBecomesUnknown() {
-
-        StrategyService strategyService =
-                mock(StrategyService.class);
-
-        MockOrderService orderService =
-                mock(MockOrderService.class);
-
-        TradeStateMachine fsm =
-                new TradeStateMachine();
-
-        BotStateMachine botStateMachine =
-                mock(BotStateMachine.class);
-
-        when(botStateMachine.isActive())
-                .thenReturn(true);
-
-        when(strategyService.evaluate("ETHUSDT"))
-                .thenReturn(trueSignal());
-
-        when(orderService.buy("ETHUSDT"))
-                .thenReturn(MockOrderResult.TIMEOUT);
-
-        TradeService tradeService =
-                new TradeService(
-                        strategyService,
-                        fsm,
-                        orderService,
-                        botStateMachine
-                );
-
-        tradeService.checkAndBuy("ETHUSDT");
-
-        assertEquals(
-                TradeState.UNKNOWN,
-                fsm.getState()
-        );
-
-        verify(orderService, times(1))
-                .buy("ETHUSDT");
     }
 
     @Test
@@ -198,14 +82,19 @@ class TradeServiceTest {
         StrategyService strategyService =
                 mock(StrategyService.class);
 
-        MockOrderService orderService =
-                mock(MockOrderService.class);
+        BuyOrderExecutionService executionService =
+                mock(BuyOrderExecutionService.class);
 
-        TradeStateMachine fsm =
-                new TradeStateMachine();
+        ClientOrderIdGenerator idGenerator =
+                mock(ClientOrderIdGenerator.class);
 
         BotStateMachine botStateMachine =
                 mock(BotStateMachine.class);
+
+        TradingOrderProperties orderProperties =
+                new TradingOrderProperties(
+                        new BigDecimal("20.00")
+                );
 
         EntrySignalResult falseSignal =
                 new EntrySignalResult(
@@ -227,22 +116,101 @@ class TradeServiceTest {
         TradeService tradeService =
                 new TradeService(
                         strategyService,
-                        fsm,
-                        orderService,
+                        executionService,
+                        idGenerator,
+                        orderProperties,
                         botStateMachine
                 );
 
         tradeService.checkAndBuy("ETHUSDT");
 
-        assertEquals(
-                TradeState.READY,
-                fsm.getState()
-        );
-
-        verify(strategyService, times(1))
+        verify(strategyService)
                 .evaluate("ETHUSDT");
 
-        verify(orderService, never())
-                .buy(anyString());
+        verifyNoInteractions(
+                executionService
+        );
+
+        verifyNoInteractions(
+                idGenerator
+        );
+    }
+
+    @Test
+    void trueSignalCreatesBuyRequestAndSubmits() {
+
+        StrategyService strategyService =
+                mock(StrategyService.class);
+
+        BuyOrderExecutionService executionService =
+                mock(BuyOrderExecutionService.class);
+
+        ClientOrderIdGenerator idGenerator =
+                mock(ClientOrderIdGenerator.class);
+
+        BotStateMachine botStateMachine =
+                mock(BotStateMachine.class);
+
+        TradingOrderProperties orderProperties =
+                new TradingOrderProperties(
+                        new BigDecimal("20.00")
+                );
+
+        when(botStateMachine.isActive())
+                .thenReturn(true);
+
+        when(strategyService.evaluate("ETHUSDT"))
+                .thenReturn(trueSignal());
+
+        when(idGenerator.next())
+                .thenReturn("bot-test-123");
+
+        TradeService tradeService =
+                new TradeService(
+                        strategyService,
+                        executionService,
+                        idGenerator,
+                        orderProperties,
+                        botStateMachine
+                );
+
+        tradeService.checkAndBuy("ETHUSDT");
+
+        ArgumentCaptor<OrderRequest> captor =
+                ArgumentCaptor.forClass(
+                        OrderRequest.class
+                );
+
+        verify(executionService)
+                .submit(captor.capture());
+
+        OrderRequest request =
+                captor.getValue();
+
+        assertEquals(
+                "ETHUSDT",
+                request.symbol()
+        );
+
+        assertEquals(
+                OrderSide.BUY,
+                request.side()
+        );
+
+        assertEquals(
+                0,
+                new BigDecimal("20.00")
+                        .compareTo(
+                                request.quoteQuantity()
+                        )
+        );
+
+        assertEquals(
+                "bot-test-123",
+                request.clientOrderId()
+        );
+
+        verify(idGenerator)
+                .next();
     }
 }
